@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro de Recepción de Materiales</title>
-    <!-- Tailwind CSS para estilos -->
+    <title>Solicitudes de Recolección de Material</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Librería SheetJS para exportar a Excel -->
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- SheetJS para Excel -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <!-- Iconos de Lucide -->
+    <!-- Iconos Lucide -->
     <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800 font-sans p-4 md:p-8">
@@ -19,99 +21,87 @@
         <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl shadow-sm border border-slate-200">
             <div>
                 <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
-                    <i data-lucide="package-check" class="text-indigo-600"></i>
-                    Control de Recepción de Materiales
+                    <i data-lucide="truck" class="text-indigo-600"></i>
+                    Control de Recolección de Materiales
                 </h1>
-                <p class="text-sm text-slate-500 mt-1">Captura de folios, materiales y exportación directa a Excel</p>
+                <p class="text-sm text-slate-500 mt-1">Solicitudes e historial sincronizados en tiempo real</p>
             </div>
             <button onclick="exportarAExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2 text-sm">
                 <i data-lucide="file-spreadsheet"></i>
-                Exportar a Excel (.xlsx)
+                Exportar a Excel
             </button>
         </header>
 
-        <!-- Indicadores rápidos -->
+        <!-- Contadores -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                 <div>
-                    <p class="text-xs font-semibold uppercase text-slate-400">Total Recepciones</p>
-                    <p id="statTotal" class="text-2xl font-bold text-slate-800 mt-1">0</p>
+                    <p class="text-xs font-semibold uppercase text-amber-600">Pendientes (Abiertos)</p>
+                    <p id="statAbiertos" class="text-3xl font-bold text-amber-600 mt-1">0</p>
+                </div>
+                <div class="p-3 bg-amber-50 text-amber-600 rounded-lg"><i data-lucide="clock"></i></div>
+            </div>
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase text-emerald-600">Recolectados (Cerrados)</p>
+                    <p id="statCerrados" class="text-3xl font-bold text-emerald-600 mt-1">0</p>
+                </div>
+                <div class="p-3 bg-emerald-50 text-emerald-600 rounded-lg"><i data-lucide="check-circle-2"></i></div>
+            </div>
+            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase text-slate-400">Total Solicitudes</p>
+                    <p id="statTotal" class="text-3xl font-bold text-slate-800 mt-1">0</p>
                 </div>
                 <div class="p-3 bg-indigo-50 text-indigo-600 rounded-lg"><i data-lucide="layers"></i></div>
-            </div>
-            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-semibold uppercase text-slate-400">Piezas / Unidades</p>
-                    <p id="statPiezas" class="text-2xl font-bold text-slate-800 mt-1">0</p>
-                </div>
-                <div class="p-3 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="boxes"></i></div>
-            </div>
-            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
-                <div>
-                    <p class="text-xs font-semibold uppercase text-slate-400">Último Folio</p>
-                    <p id="statUltimoFolio" class="text-2xl font-bold text-slate-800 mt-1">---</p>
-                </div>
-                <div class="p-3 bg-emerald-50 text-emerald-600 rounded-lg"><i data-lucide="hash"></i></div>
             </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            <!-- Formulario de captura -->
+            <!-- Formulario: Solicitar Recolección -->
             <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-1 h-fit">
                 <h2 class="text-lg font-semibold text-slate-800 mb-4 border-b pb-2 flex items-center gap-2">
                     <i data-lucide="plus-circle" class="text-indigo-600"></i>
-                    Nuevo Registro
+                    Solicitar Recolección
                 </h2>
                 
-                <form id="registroForm" onsubmit="agregarRegistro(event)" class="space-y-4">
+                <form id="solicitudForm" onsubmit="crearSolicitud(event)" class="space-y-4">
                     <div>
-                        <label class="block text-xs font-medium text-slate-700 uppercase mb-1">Folio / Remisión *</label>
-                        <input type="text" id="folio" required placeholder="Ej: REC-2026-001" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-slate-700 uppercase mb-1">Proveedor / Origen *</label>
-                        <input type="text" id="proveedor" required placeholder="Ej: Logística Central" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <label class="block text-xs font-medium text-slate-700 uppercase mb-1">Ubicación / Área *</label>
+                        <input type="text" id="ubicacion" required placeholder="Ej: Pasillo 3, Almacén General, Nave B..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                     </div>
 
                     <div>
-                        <label class="block text-xs font-medium text-slate-700 uppercase mb-1">Descripción del Material *</label>
-                        <textarea id="descripcion" required rows="2" placeholder="Ej: Caja de insumos con QR de verificación..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+                        <label class="block text-xs font-medium text-slate-700 uppercase mb-1">Material a Recolectar *</label>
+                        <input type="text" id="material" required placeholder="Ej: Tarimas de plástico, Cartón, Scraps..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                     </div>
 
-                    <div class="grid grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-700 uppercase mb-1">Cantidad *</label>
-                            <input type="number" id="cantidad" min="1" value="1" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-700 uppercase mb-1">Estado</label>
-                            <select id="estado" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                                <option value="Recibido Completo">Recibido Completo</option>
-                                <option value="Pendiente Revisión">Pendiente Revisión</option>
-                                <option value="Con Inconsistencia">Con Inconsistencia</option>
-                            </select>
-                        </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 uppercase mb-1">Cantidad / Detalles</label>
+                        <input type="text" id="cantidad" placeholder="Ej: 5 contenedores, ~200 kg, 3 cajas..." class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                     </div>
 
-                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg shadow transition flex items-center justify-center gap-2 text-sm mt-2">
-                        <i data-lucide="save"></i>
-                        Guardar Registro
+                    <button type="submit" id="btnGuardar" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg shadow transition flex items-center justify-center gap-2 text-sm mt-2">
+                        <i data-lucide="send"></i>
+                        Enviar Solicitud (Abierto)
                     </button>
                 </form>
             </div>
 
-            <!-- Tabla de datos -->
+            <!-- Lista de Recolecciones -->
             <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2 space-y-4">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                     <h2 class="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                        <i data-lucide="list" class="text-indigo-600"></i>
-                        Historial de Recepciones
+                        <i data-lucide="list-todo" class="text-indigo-600"></i>
+                        Estatus de Solicitudes
                     </h2>
-                    <div class="relative w-full sm:w-64">
-                        <i data-lucide="search" class="absolute left-3 top-2.5 text-slate-400 w-4 h-4"></i>
-                        <input type="text" id="buscador" oninput="filtrarTabla()" placeholder="Buscar por folio o proveedor..." class="w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <div class="flex items-center gap-2">
+                        <select id="filtroEstatus" onchange="renderizarTabla()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="todos">Mostrar Todos</option>
+                            <option value="Abierto" selected>Solo Abiertos</option>
+                            <option value="Cerrado">Solo Cerrados</option>
+                        </select>
                     </div>
                 </div>
 
@@ -119,17 +109,18 @@
                     <table class="w-full text-left text-sm text-slate-600">
                         <thead class="bg-slate-50 text-slate-700 font-medium uppercase text-xs border-b border-slate-200">
                             <tr>
-                                <th class="p-3">Folio</th>
                                 <th class="p-3">Fecha/Hora</th>
-                                <th class="p-3">Proveedor</th>
+                                <th class="p-3">Ubicación</th>
                                 <th class="p-3">Material</th>
-                                <th class="p-3 text-center">Cant.</th>
-                                <th class="p-3">Estado</th>
+                                <th class="p-3">Cantidad</th>
+                                <th class="p-3">Estatus</th>
                                 <th class="p-3 text-center">Acción</th>
                             </tr>
                         </thead>
                         <tbody id="tablaCuerpo" class="divide-y divide-slate-200">
-                            <!-- Filas dinámicas -->
+                            <tr>
+                                <td colspan="6" class="p-6 text-center text-slate-400">Cargando datos...</td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -139,67 +130,125 @@
     </div>
 
     <script>
-        let registros = JSON.parse(localStorage.getItem('registros_recepcion') || '[]');
+        // CREDENCIALES CONFIGURADAS
+        const SUPABASE_URL = 'https://pzwuioljpciyhaeybqsf.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6d3Vpb2xqcGNpeWhhZXlicXNmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMzI0NDYsImV4cCI6MjEwNjgwODQ0Nn0.2fBbLkhAhpkmXWpTxtRx5cOzkKejnxoVuPmLMSPXQnU';
+
+        const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let listaSolicitudes = [];
 
         document.addEventListener('DOMContentLoaded', () => {
-            renderizar();
-            lucide.createIcons();
+            cargarDatos();
+            suscribirACambiosEnTiempoReal();
         });
 
-        function guardarEnLocalStorage() {
-            localStorage.setItem('registros_recepcion', JSON.stringify(registros));
-            renderizar();
+        async function cargarDatos() {
+            const { data, error } = await db
+                .from('recolecciones')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                console.error('Error al cargar solicitudes:', error);
+                alert('Error al conectar con la base de datos.');
+                return;
+            }
+
+            listaSolicitudes = data || [];
+            renderizarTabla();
         }
 
-        function agregarRegistro(e) {
+        async function crearSolicitud(e) {
             e.preventDefault();
-            const nuevo = {
-                id: Date.now(),
-                folio: document.getElementById('folio').value.trim(),
-                proveedor: document.getElementById('proveedor').value.trim(),
-                descripcion: document.getElementById('descripcion').value.trim(),
-                cantidad: parseInt(document.getElementById('cantidad').value) || 1,
-                estado: document.getElementById('estado').value,
-                fecha: new Date().toLocaleString('es-MX')
+            const btn = document.getElementById('btnGuardar');
+            btn.disabled = true;
+            btn.innerText = 'Enviando...';
+
+            const nuevaSolicitud = {
+                ubicacion: document.getElementById('ubicacion').value.trim(),
+                material: document.getElementById('material').value.trim(),
+                cantidad: document.getElementById('cantidad').value.trim() || 'N/A',
+                estatus: 'Abierto'
             };
 
-            registros.unshift(nuevo);
-            guardarEnLocalStorage();
-            document.getElementById('registroForm').reset();
-            document.getElementById('cantidad').value = "1";
-        }
+            const { error } = await db.from('recolecciones').insert([nuevaSolicitud]);
 
-        function eliminarRegistro(id) {
-            if (confirm('¿Deseas borrar este registro?')) {
-                registros = registros.filter(item => item.id !== id);
-                guardarEnLocalStorage();
+            btn.disabled = false;
+            btn.innerHTML = `<i data-lucide="send"></i> Enviar Solicitud (Abierto)`;
+
+            if (error) {
+                alert('Ocurrió un error al guardar la solicitud.');
+                console.error(error);
+            } else {
+                document.getElementById('solicitudForm').reset();
+                cargarDatos();
             }
         }
 
-        function renderizar(filtrados = null) {
-            const datos = filtrados || registros;
+        async function cambiarEstatus(id, nuevoEstatus) {
+            const { error } = await db
+                .from('recolecciones')
+                .update({ estatus: nuevoEstatus })
+                .eq('id', id);
+
+            if (error) {
+                alert('No se pudo actualizar el estatus.');
+                console.error(error);
+            } else {
+                cargarDatos();
+            }
+        }
+
+        async function eliminarRegistro(id) {
+            if (confirm('¿Deseas eliminar permanentemente esta solicitud?')) {
+                const { error } = await db.from('recolecciones').delete().eq('id', id);
+                if (error) {
+                    alert('Error al eliminar.');
+                } else {
+                    cargarDatos();
+                }
+            }
+        }
+
+        function renderizarTabla() {
+            const filtro = document.getElementById('filtroEstatus').value;
             const cuerpo = document.getElementById('tablaCuerpo');
+            
+            let filtrados = listaSolicitudes;
+            if (filtro !== 'todos') {
+                filtrados = listaSolicitudes.filter(s => s.estatus === filtro);
+            }
+
             cuerpo.innerHTML = '';
 
-            if (datos.length === 0) {
-                cuerpo.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-slate-400">No hay registros guardados.</td></tr>`;
+            if (filtrados.length === 0) {
+                cuerpo.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">No hay registros para mostrar.</td></tr>`;
             } else {
-                datos.forEach(item => {
-                    let badgeColor = 'bg-slate-100 text-slate-700';
-                    if (item.estado === 'Recibido Completo') badgeColor = 'bg-emerald-100 text-emerald-800';
-                    if (item.estado === 'Pendiente Revisión') badgeColor = 'bg-amber-100 text-amber-800';
-                    if (item.estado === 'Con Inconsistencia') badgeColor = 'bg-rose-100 text-rose-800';
+                filtrados.forEach(item => {
+                    const fecha = new Date(item.created_at).toLocaleString('es-MX');
+                    const esAbierto = item.estatus === 'Abierto';
+                    const badgeClass = esAbierto 
+                        ? 'bg-amber-100 text-amber-800 font-semibold border border-amber-300' 
+                        : 'bg-emerald-100 text-emerald-800 font-semibold border border-emerald-300';
+
+                    const botonAccion = esAbierto
+                        ? `<button onclick="cambiarEstatus(${item.id}, 'Cerrado')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3 py-1.5 rounded shadow transition flex items-center gap-1 mx-auto">
+                            <i data-lucide="check" class="w-3.5 h-3.5"></i> Marcar Cerrado
+                           </button>`
+                        : `<button onclick="cambiarEstatus(${item.id}, 'Abierto')" class="bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium px-3 py-1.5 rounded transition flex items-center gap-1 mx-auto opacity-75">
+                            <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Reabrir
+                           </button>`;
 
                     cuerpo.innerHTML += `
                         <tr class="hover:bg-slate-50 transition">
-                            <td class="p-3 font-semibold text-slate-900">${item.folio}</td>
-                            <td class="p-3 text-xs text-slate-500">${item.fecha}</td>
-                            <td class="p-3">${item.proveedor}</td>
-                            <td class="p-3">${item.descripcion}</td>
-                            <td class="p-3 text-center font-bold">${item.cantidad}</td>
-                            <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs font-medium ${badgeColor}">${item.estado}</span></td>
-                            <td class="p-3 text-center">
-                                <button onclick="eliminarRegistro(${item.id})" class="text-rose-500 hover:text-rose-700 p-1 rounded hover:bg-rose-50 transition">
+                            <td class="p-3 text-xs text-slate-500">${fecha}</td>
+                            <td class="p-3 font-semibold text-slate-900">${item.ubicacion}</td>
+                            <td class="p-3">${item.material}</td>
+                            <td class="p-3 font-medium">${item.cantidad}</td>
+                            <td class="p-3"><span class="px-2.5 py-1 rounded-full text-xs ${badgeClass}">${item.estatus}</span></td>
+                            <td class="p-3 text-center flex items-center justify-center gap-2">
+                                ${botonAccion}
+                                <button onclick="eliminarRegistro(${item.id})" class="text-rose-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition" title="Eliminar">
                                     <i data-lucide="trash-2" class="w-4 h-4"></i>
                                 </button>
                             </td>
@@ -208,42 +257,44 @@
                 });
             }
 
-            // Actualizar Estadísticas
-            document.getElementById('statTotal').innerText = registros.length;
-            document.getElementById('statPiezas').innerText = registros.reduce((acc, curr) => acc + curr.cantidad, 0);
-            document.getElementById('statUltimoFolio').innerText = registros.length > 0 ? registros[0].folio : '---';
+            // Estadísticas globales
+            const abiertos = listaSolicitudes.filter(s => s.estatus === 'Abierto').length;
+            const cerrados = listaSolicitudes.filter(s => s.estatus === 'Cerrado').length;
+
+            document.getElementById('statAbiertos').innerText = abiertos;
+            document.getElementById('statCerrados').innerText = cerrados;
+            document.getElementById('statTotal').innerText = listaSolicitudes.length;
+
             lucide.createIcons();
         }
 
-        function filtrarTabla() {
-            const query = document.getElementById('buscador').value.toLowerCase();
-            const filtrados = registros.filter(r => 
-                r.folio.toLowerCase().includes(query) || 
-                r.proveedor.toLowerCase().includes(query) ||
-                r.descripcion.toLowerCase().includes(query)
-            );
-            renderizar(filtrados);
+        // Escuchar cambios en tiempo real
+        function suscribirACambiosEnTiempoReal() {
+            db.channel('realtime_recolecciones')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'recolecciones' }, () => {
+                    cargarDatos();
+                })
+                .subscribe();
         }
 
         function exportarAExcel() {
-            if (registros.length === 0) {
-                alert('No hay información guardada para exportar.');
+            if (listaSolicitudes.length === 0) {
+                alert('No hay solicitudes para exportar.');
                 return;
             }
 
-            const datosExcel = registros.map(r => ({
-                "Folio": r.folio,
-                "Fecha de Registro": r.fecha,
-                "Proveedor / Origen": r.proveedor,
-                "Descripción Material": r.descripcion,
-                "Cantidad": r.cantidad,
-                "Estado": r.estado
+            const datosExcel = listaSolicitudes.map(s => ({
+                "Fecha / Hora": new Date(s.created_at).toLocaleString('es-MX'),
+                "Ubicación / Área": s.ubicacion,
+                "Material": s.material,
+                "Cantidad": s.cantidad,
+                "Estatus": s.estatus
             }));
 
             const worksheet = XLSX.utils.json_to_sheet(datosExcel);
             const workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Recepciones");
-            XLSX.writeFile(workbook, `Recepcion_Materiales_${new Date().toISOString().slice(0,10)}.xlsx`);
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Recolecciones");
+            XLSX.writeFile(workbook, `Recolecciones_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
     </script>
 </body>
